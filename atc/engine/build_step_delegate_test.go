@@ -211,7 +211,7 @@ var _ = Describe("BuildStepDelegate", func() {
 
 		It("returns an image spec containing the artifact", func() {
 			Expect(imageSpec).To(Equal(runtime.ImageSpec{
-				ImageVolume: "image-volume",
+				ImageVolume: volume,
 				Privileged:  false,
 			}))
 		})
@@ -238,7 +238,7 @@ var _ = Describe("BuildStepDelegate", func() {
 
 			It("returns a privileged image spec", func() {
 				Expect(imageSpec).To(Equal(runtime.ImageSpec{
-					ImageVolume: "image-volume",
+					ImageVolume: volume,
 					Privileged:  true,
 				}))
 			})
@@ -510,7 +510,7 @@ var _ = Describe("BuildStepDelegate", func() {
 				Expect(plan.Get.Name).To(Equal("some-name"))
 
 				Expect(imageSpec).To(Equal(runtime.ImageSpec{
-					ImageVolume: "some-volume",
+					ImageVolume: namedArtifact,
 				}))
 			})
 		})
