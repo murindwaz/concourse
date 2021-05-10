@@ -18,7 +18,7 @@ func NewPlanner(planFactory atc.PlanFactory) Planner {
 func (planner Planner) Create(
 	planConfig atc.StepConfig,
 	resources db.SchedulerResources,
-	resourceTypes atc.VersionedResourceTypes,
+	resourceTypes atc.ResourceTypes,
 	prototypes atc.Prototypes,
 	inputs []db.BuildInput,
 ) (atc.Plan, error) {
@@ -43,7 +43,7 @@ type planVisitor struct {
 	planFactory atc.PlanFactory
 
 	resources     db.SchedulerResources
-	resourceTypes atc.VersionedResourceTypes
+	resourceTypes atc.ResourceTypes
 	prototypes    atc.Prototypes
 	inputs        []db.BuildInput
 
@@ -52,19 +52,20 @@ type planVisitor struct {
 
 func (visitor *planVisitor) VisitTask(step *atc.TaskStep) error {
 	visitor.plan = visitor.planFactory.NewPlan(atc.TaskPlan{
-		Name:                   step.Name,
-		Privileged:             step.Privileged,
-		Limits:                 step.Limits,
-		Config:                 step.Config,
-		ConfigPath:             step.ConfigPath,
-		VersionedResourceTypes: visitor.resourceTypes,
-		Vars:                   step.Vars,
-		Tags:                   step.Tags,
-		Params:                 step.Params,
-		InputMapping:           step.InputMapping,
-		OutputMapping:          step.OutputMapping,
-		ImageArtifactName:      step.ImageArtifactName,
-		Timeout:                step.Timeout,
+		Name:              step.Name,
+		Privileged:        step.Privileged,
+		Limits:            step.Limits,
+		Config:            step.Config,
+		ConfigPath:        step.ConfigPath,
+		Vars:              step.Vars,
+		Tags:              step.Tags,
+		Params:            step.Params,
+		InputMapping:      step.InputMapping,
+		OutputMapping:     step.OutputMapping,
+		ImageArtifactName: step.ImageArtifactName,
+		Timeout:           step.Timeout,
+
+		ResourceTypes: visitor.resourceTypes,
 	})
 
 	return nil
@@ -128,7 +129,7 @@ func (visitor *planVisitor) VisitGet(step *atc.GetStep) error {
 		Timeout:  step.Timeout,
 	})
 
-	plan.Get.TypeImage = visitor.resourceTypes.ImageForType(plan.ID, resource.Type, step.Tags)
+	plan.Get.TypeImage = visitor.resourceTypes.ImageForType(plan.ID, resource.Type, step.Tags, false)
 	visitor.plan = plan
 	return nil
 }
@@ -161,7 +162,7 @@ func (visitor *planVisitor) VisitPut(step *atc.PutStep) error {
 		ExposeBuildCreatedBy: resource.ExposeBuildCreatedBy,
 	})
 
-	plan.Put.TypeImage = visitor.resourceTypes.ImageForType(plan.ID, resource.Type, step.Tags)
+	plan.Put.TypeImage = visitor.resourceTypes.ImageForType(plan.ID, resource.Type, step.Tags, false)
 
 	dependentGetPlan := visitor.planFactory.NewPlan(atc.GetPlan{
 		Type:        resource.Type,
@@ -175,7 +176,7 @@ func (visitor *planVisitor) VisitPut(step *atc.PutStep) error {
 		Timeout: step.Timeout,
 	})
 
-	dependentGetPlan.Get.TypeImage = visitor.resourceTypes.ImageForType(dependentGetPlan.ID, resource.Type, step.Tags)
+	dependentGetPlan.Get.TypeImage = visitor.resourceTypes.ImageForType(dependentGetPlan.ID, resource.Type, step.Tags, false)
 
 	visitor.plan = visitor.planFactory.NewPlan(atc.OnSuccessPlan{
 		Step: plan,
@@ -441,7 +442,7 @@ func (visitor *planVisitor) VisitEnsure(step *atc.EnsureStep) error {
 	return nil
 }
 
-func FetchImagePlan(planID atc.PlanID, image atc.ImageResource, resourceTypes atc.VersionedResourceTypes, stepTags atc.Tags) (atc.Plan, *atc.Plan) {
+func FetchImagePlan(planID atc.PlanID, image atc.ImageResource, resourceTypes atc.ResourceTypes, stepTags atc.Tags) (atc.Plan, *atc.Plan) {
 	// If resource type is a custom type, recurse in order to resolve nested resource types
 	getPlanID := planID + "/image-get"
 
@@ -459,7 +460,7 @@ func FetchImagePlan(planID atc.PlanID, image atc.ImageResource, resourceTypes at
 			Source: image.Source,
 			Params: image.Params,
 
-			TypeImage: resourceTypes.ImageForType(getPlanID, image.Type, tags),
+			TypeImage: resourceTypes.ImageForType(getPlanID, image.Type, tags, false),
 
 			Tags: tags,
 		},
@@ -476,7 +477,7 @@ func FetchImagePlan(planID atc.PlanID, image atc.ImageResource, resourceTypes at
 				Type:   image.Type,
 				Source: image.Source,
 
-				TypeImage: resourceTypes.ImageForType(checkPlanID, image.Type, tags),
+				TypeImage: resourceTypes.ImageForType(checkPlanID, image.Type, tags, false),
 
 				Tags: tags,
 			},
