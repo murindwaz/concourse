@@ -1009,13 +1009,6 @@ func (cmd *RunCommand) backendComponents(
 		return nil, err
 	}
 
-	streamer := worker.Streamer{
-		Compression: cmd.compression(),
-
-		EnableP2PStreaming:  cmd.FeatureFlags.EnableP2PVolumeStreaming,
-		P2PStreamingTimeout: cmd.P2pVolumeStreamingTimeout,
-	}
-
 	defaultLimits, err := cmd.parseDefaultLimits()
 	if err != nil {
 		return nil, err
@@ -1037,7 +1030,6 @@ func (cmd *RunCommand) backendComponents(
 
 	engine := cmd.constructEngine(
 		pool,
-		streamer,
 		resourceGetter,
 		dbWorkerFactory,
 		teamFactory,
@@ -1147,6 +1139,13 @@ func (cmd *RunCommand) compression() compression.Compression {
 	}
 }
 
+func (cmd *RunCommand) streamer(cacheFactory db.ResourceCacheFactory) worker.Streamer {
+	return worker.NewStreamer(cacheFactory, cmd.compression(), worker.P2PConfig{
+		Enabled: cmd.FeatureFlags.EnableP2PVolumeStreaming,
+		Timeout: cmd.P2pVolumeStreamingTimeout,
+	})
+}
+
 func (cmd *RunCommand) constructPool(dbConn db.Conn, lockFactory lock.LockFactory) (worker.Pool, error) {
 	dbResourceCacheFactory := db.NewResourceCacheFactory(dbConn, lockFactory)
 	dbWorkerBaseResourceTypeFactory := db.NewWorkerBaseResourceTypeFactory(dbConn)
@@ -1178,7 +1177,7 @@ func (cmd *RunCommand) constructPool(dbConn db.Conn, lockFactory lock.LockFactor
 			GardenRequestTimeout:              cmd.GardenRequestTimeout,
 			BaggageclaimResponseHeaderTimeout: cmd.BaggageclaimResponseHeaderTimeout,
 			HTTPRetryTimeout:                  5 * time.Minute,
-			Compression:                       cmd.compression(),
+			Streamer:                          cmd.streamer(dbResourceCacheFactory),
 		},
 		db,
 		workerVersion,
@@ -1662,7 +1661,6 @@ func (cmd *RunCommand) configureAuthForDefaultTeam(teamFactory db.TeamFactory) e
 
 func (cmd *RunCommand) constructEngine(
 	workerPool worker.Pool,
-	streamer worker.Streamer,
 	resourceGetter resource.Getter,
 	workerFactory db.WorkerFactory,
 	teamFactory db.TeamFactory,
@@ -1680,7 +1678,7 @@ func (cmd *RunCommand) constructEngine(
 		engine.NewStepperFactory(
 			engine.NewCoreStepFactory(
 				workerPool,
-				streamer,
+				cmd.streamer(resourceCacheFactory),
 				resourceGetter,
 				teamFactory,
 				buildFactory,
