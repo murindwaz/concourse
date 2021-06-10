@@ -43,7 +43,6 @@ import (
 	"github.com/concourse/concourse/atc/lidar"
 	"github.com/concourse/concourse/atc/metric"
 	"github.com/concourse/concourse/atc/policy"
-	"github.com/concourse/concourse/atc/resource"
 	"github.com/concourse/concourse/atc/scheduler"
 	"github.com/concourse/concourse/atc/scheduler/algorithm"
 	"github.com/concourse/concourse/atc/syslog"
@@ -997,9 +996,6 @@ func (cmd *RunCommand) backendComponents(
 	dbJobFactory := db.NewJobFactory(dbConn, lockFactory)
 	dbPipelineLifecycle := db.NewPipelineLifecycle(dbConn, lockFactory)
 
-	dbVolumeRepository := db.NewVolumeRepository(dbConn)
-	resourceGetter := resource.NewGetter(lockFactory, clock.NewClock(), dbResourceCacheFactory, dbVolumeRepository)
-
 	dbWorkerFactory := db.NewWorkerFactory(dbConn)
 
 	alg := algorithm.New(db.NewVersionsDB(dbConn, algorithmLimitRows, schedulerCache))
@@ -1030,7 +1026,6 @@ func (cmd *RunCommand) backendComponents(
 
 	engine := cmd.constructEngine(
 		pool,
-		resourceGetter,
 		dbWorkerFactory,
 		teamFactory,
 		dbBuildFactory,
@@ -1661,7 +1656,6 @@ func (cmd *RunCommand) configureAuthForDefaultTeam(teamFactory db.TeamFactory) e
 
 func (cmd *RunCommand) constructEngine(
 	workerPool worker.Pool,
-	resourceGetter resource.Getter,
 	workerFactory db.WorkerFactory,
 	teamFactory db.TeamFactory,
 	buildFactory db.BuildFactory,
@@ -1679,7 +1673,7 @@ func (cmd *RunCommand) constructEngine(
 			engine.NewCoreStepFactory(
 				workerPool,
 				cmd.streamer(resourceCacheFactory),
-				resourceGetter,
+				lockFactory,
 				teamFactory,
 				buildFactory,
 				resourceCacheFactory,
@@ -1692,6 +1686,7 @@ func (cmd *RunCommand) constructEngine(
 			rateLimiter,
 			policyChecker,
 			workerFactory,
+			resourceCacheFactory,
 			lockFactory,
 		),
 		secretManager,
