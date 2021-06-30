@@ -275,11 +275,10 @@ func (r *resource) CheckPlan(planFactory atc.PlanFactory, imagePlanner ImagePlan
 	return plan
 }
 
-// CreateBuild creates a check build for this resource. It returns back the
-// build that was created, whether or not it was successful and any errors.
-//
-// If a build is already running for this resource, a new build will not be
-// created unless manuallTriggered is true.
+// CreateBuild tries to create a check build for this resource. A new build
+// will only be created if there isn't an existing running check build for this
+// resource, or if the build is manuallyTriggered (in which case a new build
+// will always be created).
 func (r *resource) CreateBuild(ctx context.Context, manuallyTriggered bool, plan atc.Plan) (Build, bool, error) {
 	tx, err := r.conn.Begin()
 	if err != nil {
@@ -788,7 +787,7 @@ func (r *resource) ClearResourceCache(version atc.Version) (int64, error) {
 		return 0, err
 	}
 
-	results, err := tx.Exec(`DELETE FROM worker_resource_caches WHERE resource_cache_id IN (` + sqlStatement + `)`, args...)
+	results, err := tx.Exec(`DELETE FROM worker_resource_caches WHERE resource_cache_id IN (`+sqlStatement+`)`, args...)
 
 	if err != nil {
 		return 0, err
